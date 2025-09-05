@@ -1,0 +1,38 @@
+grafana:
+  enabled: true
+  defaultDashboardsEnabled: true
+  adminUser: admin
+  adminPassword: admin123
+  service:
+    type: LoadBalancer
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClassName: gp2
+  ingress:
+    enabled: false
+
+prometheus:
+  prometheusSpec:
+    retention: 7d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp2
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi
+
+alertmanager:
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp2
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 2Gi
+
+

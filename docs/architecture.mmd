@@ -1,0 +1,34 @@
+flowchart LR
+  user[User] -->|HTTPS| ingress[Ingress NGINX (ELB)]
+  ingress --> svc[Service snake-game]
+  svc --> pod1[Pod snake-game]
+  svc --> pod2[Pod snake-game]
+  subgraph EKS Cluster
+    ingress
+    svc
+    pod1
+    pod2
+    prom[Prometheus]
+    graf[Grafana]
+    alert[Alertmanager]
+  end
+  prom <-- ServiceMonitor / scrape --> pod1
+  prom <-- ServiceMonitor / scrape --> pod2
+  graf <-- dashboards --> prom
+  style graf fill:#1f6feb,stroke:#0a3069,color:#fff
+
+  subgraph AWS
+    ECR[ECR repo]
+    S3[(S3 bucket)]
+    Aurora[(Aurora PG Serverless v2)]
+  end
+  pod1 -- metrics --> prom
+  pod2 -- metrics --> prom
+  pod1 -- scores --> S3
+  pod1 -- scores --> Aurora
+  pod2 -- scores --> S3
+  pod2 -- scores --> Aurora
+  dev[GitHub Actions] -->|build/push| ECR
+  dev -->|Terraform apply| EKS Cluster
+
+

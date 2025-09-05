@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Snake Game</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; background: #0b1020; color: #e2e8f0; display: grid; grid-template-columns: 320px 1fr; min-height: 100vh; }
+      aside { padding: 16px; border-right: 1px solid #1f2937; background: #0f172a; }
+      main { padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+      h1 { font-size: 20px; margin: 0 0 12px; }
+      canvas { background: #111827; border: 1px solid #374151; }
+      .score { font-weight: 700; }
+      button { background: #2563eb; color: white; border: 0; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: 6px 8px; border-bottom: 1px solid #253047; font-size: 12px; }
+      .row { display: flex; gap: 8px; align-items: center; }
+      input { background: #0b1227; color: #e2e8f0; border: 1px solid #253047; border-radius: 6px; padding: 6px 8px; }
+      small { color: #94a3b8; }
+    </style>
+  </head>
+  <body>
+    <aside>
+      <h1>Snake Game</h1>
+      <div class="row">
+        <input id="userId" placeholder="User (optional)" />
+        <button id="startBtn">Start</button>
+        <button id="stopBtn" disabled>Stop</button>
+      </div>
+      <p>Score: <span id="score" class="score">0</span></p>
+      <p><small>Use arrow keys or WASD. Submit score at game over.</small></p>
+      <h3>Top Scores</h3>
+      <table>
+        <thead>
+          <tr><th>User</th><th>Points</th><th>When</th></tr>
+        </thead>
+        <tbody id="scoresBody"></tbody>
+      </table>
+    </aside>
+    <main>
+      <canvas id="canvas" width="640" height="640"></canvas>
+    </main>
+
+    <script>
+      const api = {
+        async listScores() {
+          const res = await fetch('/api/scores');
+          return res.json();
+        },
+        async submitScore(user_id, points) {
+          await fetch('/api/scores', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id, points }) });
+        },
+        async sessionStart() { try { await fetch('/api/session/start', { method: 'POST' }); } catch (e) {} },
+        async sessionEnd() { try { await fetch('/api/session/end', { method: 'POST' }); } catch (e) {} },
+      };
+
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      const scoreEl = document.getElementById('score');
+      const startBtn = document.getElementById('startBtn');
+      const stopBtn = document.getElementById('stopBtn');
+      const userInput = document.getElementById('userId');
+      const scoresBody = document.getElementById('scoresBody');
+
+      const gridSize = 32; // 32x32 grid on 640 canvas
+      const tile = canvas.width / gridSize;
+      let snake, dir, food, score, loopId, playing;
+
+      function resetGame() {
+        const start = Math.floor(gridSize / 2);
+        snake = [{ x: start, y: start }];
+        dir = { x: 1, y: 0 };
+        food = spawnFood();
+        score = 0;
+        scoreEl.textContent = '0';
+      }
+
+      function spawnFood() {
+        return { x: Math.floor(Math.random() * gridSize), y: Math.floor(Math.random() * gridSize) };
+      }
+
+      function draw() {
+        ctx.fillStyle = '#0b1227';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // draw snake
+        ctx.fillStyle = '#22d3ee';
+        snake.forEach(s => ctx.fillRect(s.x * tile, s.y * tile, tile - 1, tile - 1));
+        // draw food
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(food.x * tile, food.y * tile, tile - 1, tile - 1);
+      }
+
+      function tick() {
+        const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+        // wrap around
+        head.x = (head.x + gridSize) % gridSize;
+        head.y = (head.y + gridSize) % gridSize;
+        // collision with self
+        if (snake.some((s, i) => i && s.x === head.x && s.y === head.y)) {
+          gameOver();
+          return;
+        }
+        snake.unshift(head);
+        if (head.x === food.x && head.y === food.y) {
+          score += 10;
+          scoreEl.textContent = String(score);
+          food = spawnFood();
+        } else {
+          snake.pop();
+        }
+        draw();
+      }
+
+      function gameOver() {
+        clearInterval(loopId);
+        loopId = null;
+        playing = false;
+        stopBtn.disabled = true;
+        startBtn.disabled = false;
+        api.sessionEnd();
+        const user = userInput.value.trim() || 'anonymous';
+        api.submitScore(user, score).then(loadScores);
+      }
+
+      function start() {
+        if (playing) return;
+        resetGame();
+        playing = true;
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        api.sessionStart();
+        loopId = setInterval(tick, 120);
+      }
+
+      function stop() { if (!playing) return; gameOver(); }
+
+      window.addEventListener('keydown', (e) => {
+        const key = e.key.toLowerCase();
+        if (['arrowup','w'].includes(key) && dir.y !== 1) dir = { x: 0, y: -1 };
+        if (['arrowdown','s'].includes(key) && dir.y !== -1) dir = { x: 0, y: 1 };
+        if (['arrowleft','a'].includes(key) && dir.x !== 1) dir = { x: -1, y: 0 };
+        if (['arrowright','d'].includes(key) && dir.x !== -1) dir = { x: 1, y: 0 };
+      });
+
+      startBtn.onclick = start;
+      stopBtn.onclick = stop;
+
+      async function loadScores() {
+        try {
+          const scores = await api.listScores();
+          scoresBody.innerHTML = scores.map(s => `<tr><td>${s.user_id||'anon'}</td><td>${s.points}</td><td>${new Date(s.created_at||Date.now()).toLocaleString()}</td></tr>`).join('');
+        } catch (e) {}
+      }
+
+      loadScores();
+      draw();
+    </script>
+  </body>
+  </html>
+
+

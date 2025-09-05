@@ -1,0 +1,63 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-southeast-1
+  PROJECT: snake-game
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Build, tag, and push image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/${{ env.PROJECT }}:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/${{ env.PROJECT }}:$IMAGE_TAG
+      - name: Terraform Init/Plan/Apply
+        working-directory: terraform
+        env:
+          TF_VAR_region: ${{ env.AWS_REGION }}
+          TF_VAR_snake_image_tag: ${{ github.sha }}
+        run: |
+          terraform init -input=false
+          terraform apply -auto-approve -input=false
+
+  destroy:
+    if: github.event_name == 'workflow_dispatch' && inputs.destroy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Terraform Destroy
+        working-directory: terraform
+        env:
+          TF_VAR_region: ${{ env.AWS_REGION }}
+        run: |
+          terraform init -input=false
+          terraform destroy -auto-approve -input=false
+
+

@@ -1,0 +1,11 @@
+controller:
+  service:
+    type: LoadBalancer
+    annotations: {}
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: monitoring
+
+

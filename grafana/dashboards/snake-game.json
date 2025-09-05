@@ -1,0 +1,61 @@
+{
+  "title": "Snake Game Overview",
+  "schemaVersion": 38,
+  "version": 1,
+  "panels": [
+    {
+      "type": "graph",
+      "title": "HTTP Requests Rate",
+      "targets": [
+        { "expr": "sum(rate(snake_http_requests_total[5m]))", "legendFormat": "requests/s" }
+      ],
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 }
+    },
+    {
+      "type": "stat",
+      "title": "Active Sessions",
+      "targets": [ { "expr": "snake_active_sessions" } ],
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 }
+    },
+    {
+      "type": "graph",
+      "title": "Scores Submitted",
+      "targets": [ { "expr": "rate(snake_scores_submitted_total[5m])", "legendFormat": "scores/s" } ],
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 }
+    },
+    {
+      "type": "graph",
+      "title": "Ingress Request Rate",
+      "targets": [
+        { "expr": "sum(rate(nginx_ingress_controller_requests{exported_namespace='snake'}[5m]))", "legendFormat": "ingress rps" }
+      ],
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 }
+    },
+    {
+      "type": "graph",
+      "title": "Ingress Latency p50/p90/p99",
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum(rate(nginx_ingress_controller_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.9, sum(rate(nginx_ingress_controller_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p90" },
+        { "expr": "histogram_quantile(0.99, sum(rate(nginx_ingress_controller_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p99" }
+      ],
+      "gridPos": { "x": 0, "y": 16, "w": 24, "h": 8 }
+    },
+    {
+      "type": "stat",
+      "title": "App CPU (sum)",
+      "targets": [
+        { "expr": "sum(rate(container_cpu_usage_seconds_total{pod=~'snake-game-.*'}[5m]))", "legendFormat": "cpu cores" }
+      ],
+      "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 }
+    },
+    {
+      "type": "graph",
+      "title": "Pod Restarts",
+      "targets": [ { "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace='snake'}[1h]))" } ],
+      "gridPos": { "x": 12, "y": 24, "w": 12, "h": 8 }
+    }
+  ]
+}
+
+
